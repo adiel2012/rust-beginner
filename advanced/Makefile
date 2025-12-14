@@ -4,22 +4,22 @@
 all: presentation book
 
 # Compile the presentation
-presentation: rust_presentation.tex
-	pdflatex rust_presentation.tex
-	pdflatex rust_presentation.tex
+presentation: rust_advanced.tex
+	pdflatex rust_advanced.tex
+	pdflatex rust_advanced.tex
 
 # Compile the book
-book: rust_beginner_book.tex
-	pdflatex rust_beginner_book.tex
-	pdflatex rust_beginner_book.tex
+book: rust_advanced_book.tex
+	pdflatex rust_advanced_book.tex
+	pdflatex rust_advanced_book.tex
 
 # View the presentation
-view: rust_presentation.pdf
-	start rust_presentation.pdf
+view: rust_advanced.pdf
+	start rust_advanced.pdf
 
 # View the book
-view-book: rust_beginner_book.pdf
-	start rust_beginner_book.pdf
+view-book: rust_advanced_book.pdf
+	start rust_advanced_book.pdf
 
 # Clean auxiliary files
 clean:
@@ -27,7 +27,7 @@ clean:
 
 # Clean everything including PDFs
 distclean: clean
-	rm -f rust_presentation.pdf rust_beginner_book.pdf
+	rm -f rust_advanced.pdf rust_advanced_book.pdf
 
 # Help
 help:

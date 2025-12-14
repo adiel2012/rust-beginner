@@ -1,0 +1,848 @@
+\documentclass[11pt]{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% Rust syntax highlighting
+\lstdefinestyle{rust}{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{red},
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  morekeywords={fn, let, mut, impl, trait, struct, enum, match, if, else, loop, while, for, in, return, pub, use, mod, crate, self, super, const, static, async, await, move, ref, dyn, where, type, unsafe, extern}
+}
+
+\lstset{style=rust}
+
+\title{Intermediate Rust Programming}
+\subtitle{Advanced Concepts and Patterns}
+\author{Rust Learning Series}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Prerequisites}
+  \textbf{This presentation assumes you understand:}
+  \begin{itemize}
+    \item Ownership, borrowing, and lifetimes (basics)
+    \item Structs, enums, and pattern matching
+    \item Traits and generics (fundamentals)
+    \item Error handling with Result and Option
+    \item Basic concurrency concepts
+  \end{itemize}
+
+  \vspace{0.5cm}
+  \textbf{What we'll cover:}
+  \begin{itemize}
+    \item Advanced trait patterns and design
+    \item Lifetime complexity and variance
+    \item Macro programming (declarative \& procedural)
+    \item Advanced async patterns
+    \item Unsafe Rust and FFI
+    \item Performance optimization
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \tableofcontents
+\end{frame}
+
+% ============================================
+% PART 1: ADVANCED TRAITS
+% ============================================
+\section{Advanced Trait Patterns}
+
+\begin{frame}[fragile]{Associated Types}
+  \begin{block}{Why Associated Types?}
+    Associated types allow traits to define placeholder types that implementers specify.
+  \end{block}
+
+  \begin{lstlisting}
+trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+}
+
+impl Iterator for Counter {
+    type Item = u32;
+    fn next(&mut self) -> Option<u32> { /* ... */ }
+}
+  \end{lstlisting}
+
+  \textbf{vs. Generic Parameters:}
+  \begin{itemize}
+    \item Associated types: one implementation per type
+    \item Generics: multiple implementations possible
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Trait Objects and Dynamic Dispatch}
+  \begin{block}{Object Safety}
+    A trait is object-safe if:
+    \begin{itemize}
+      \item All methods return types are sized
+      \item Methods don't use \texttt{Self} in return position
+      \item No generic methods
+    \end{itemize}
+  \end{block}
+
+  \begin{lstlisting}
+// Object-safe trait
+trait Draw {
+    fn draw(&self);
+}
+
+// Usage with trait objects
+let objects: Vec<Box<dyn Draw>> = vec![
+    Box::new(Circle { radius: 5 }),
+    Box::new(Rectangle { width: 10, height: 20 }),
+];
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Advanced Trait Bounds}
+  \begin{lstlisting}
+// Higher-Ranked Trait Bounds (HRTB)
+fn apply<F>(f: F) -> i32
+where
+    F: for<'a> Fn(&'a i32) -> &'a i32
+{
+    let x = 42;
+    *f(&x)
+}
+
+// Trait bound with associated type constraints
+fn process<T>(items: T)
+where
+    T: Iterator<Item = String> + Clone
+{
+    for item in items.clone() {
+        println!("{}", item);
+    }
+}
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Blanket Implementations}
+  \begin{lstlisting}
+// Implement trait for all types that satisfy constraints
+impl<T: Display> ToString for T {
+    fn to_string(&self) -> String {
+        format!("{}", self)
+    }
+}
+
+// Negative trait bounds (unstable)
+trait Special {}
+impl<T> Special for T where T: !Copy {}
+  \end{lstlisting}
+
+  \begin{alertblock}{Use Case}
+    Blanket implementations provide functionality to many types at once,
+    reducing code duplication.
+  \end{alertblock}
+\end{frame}
+
+% ============================================
+% PART 2: ADVANCED LIFETIMES
+% ============================================
+\section{Advanced Lifetimes}
+
+\begin{frame}[fragile]{Lifetime Variance}
+  \begin{block}{Variance Types}
+    \begin{itemize}
+      \item \textbf{Covariant}: \texttt{\&'a T} - longer lifetimes can substitute shorter
+      \item \textbf{Contravariant}: \texttt{fn(\&'a T)} - shorter lifetimes can substitute longer
+      \item \textbf{Invariant}: \texttt{\&'a mut T} - exact match required
+    \end{itemize}
+  \end{block}
+
+  \begin{lstlisting}
+// Covariance example
+fn covariant<'a>(x: &'a str) -> &'a str {
+    let y: &'static str = "hello";
+    x  // 'a can be 'static (longer lifetime)
+}
+
+// Invariance: mutable references
+fn invariant<'a>(x: &'a mut i32) {
+    // Cannot substitute different lifetimes
+}
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Multiple Lifetime Parameters}
+  \begin{lstlisting}
+struct Context<'s, 'c> {
+    session: &'s Session,
+    config: &'c Config,
+}
+
+impl<'s, 'c> Context<'s, 'c> {
+    fn new(s: &'s Session, c: &'c Config) -> Self {
+        Context { session: s, config: c }
+    }
+}
+
+// Lifetime bounds
+fn process<'a, 'b: 'a>(
+    x: &'a str,
+    y: &'b str
+) -> &'a str
+where
+    'b: 'a  // 'b outlives 'a
+{
+    if x.len() > y.len() { x } else { y }
+}
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Lifetime Elision Advanced Cases}
+  \begin{lstlisting}
+// Case 1: No elision - multiple inputs
+fn longest(x: &str, y: &str) -> &str {  // Error!
+    if x.len() > y.len() { x } else { y }
+}
+
+// Case 2: Explicit lifetimes required
+fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
+    if x.len() > y.len() { x } else { y }
+}
+
+// Case 3: Struct lifetimes
+struct Parser<'a> {
+    buffer: &'a str,
+}
+
+impl<'a> Parser<'a> {
+    fn parse(&self) -> &'a str {  // Elided!
+        self.buffer
+    }
+}
+  \end{lstlisting}
+\end{frame}
+
+% ============================================
+% PART 3: MACROS
+% ============================================
+\section{Macro Programming}
+
+\begin{frame}[fragile]{Declarative Macros (macro\_rules!)}
+  \begin{lstlisting}
+macro_rules! hashmap {
+    ($($key:expr => $val:expr),* $(,)?) => {
+        {
+            let mut map = HashMap::new();
+            $(
+                map.insert($key, $val);
+            )*
+            map
+        }
+    };
+}
+
+// Usage
+let map = hashmap! {
+    "one" => 1,
+    "two" => 2,
+};
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Procedural Macros - Derive}
+  \begin{lstlisting}
+use proc_macro::TokenStream;
+use quote::quote;
+use syn;
+
+#[proc_macro_derive(Builder)]
+pub fn derive_builder(input: TokenStream) -> TokenStream {
+    let ast = syn::parse(input).unwrap();
+    impl_builder(&ast)
+}
+
+fn impl_builder(ast: &syn::DeriveInput) -> TokenStream {
+    let name = &ast.ident;
+    let gen = quote! {
+        impl #name {
+            pub fn builder() -> Builder {
+                Builder::default()
+            }
+        }
+    };
+    gen.into()
+}
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Attribute and Function-like Macros}
+  \begin{lstlisting}
+// Attribute macro
+#[proc_macro_attribute]
+pub fn route(attr: TokenStream, item: TokenStream)
+    -> TokenStream
+{
+    // Parse attr as route path
+    // Transform function into route handler
+}
+
+// Function-like macro
+#[proc_macro]
+pub fn sql(input: TokenStream) -> TokenStream {
+    // Parse SQL at compile time
+    // Generate type-safe query code
+}
+
+// Usage
+#[route("/users/:id")]
+fn get_user(id: u32) -> User { /* ... */ }
+
+let users = sql!(SELECT * FROM users WHERE age > 18);
+  \end{lstlisting}
+\end{frame}
+
+% ============================================
+% PART 4: ADVANCED ASYNC
+% ============================================
+\section{Advanced Async Patterns}
+
+\begin{frame}[fragile]{Async Traits}
+  \begin{lstlisting}
+// Using async-trait crate
+use async_trait::async_trait;
+
+#[async_trait]
+trait AsyncDatabase {
+    async fn query(&self, sql: &str)
+        -> Result<Vec<Row>, Error>;
+}
+
+#[async_trait]
+impl AsyncDatabase for PostgresDB {
+    async fn query(&self, sql: &str)
+        -> Result<Vec<Row>, Error>
+    {
+        self.conn.query(sql).await
+    }
+}
+  \end{lstlisting}
+
+  \begin{alertblock}{Note}
+    Native async traits are unstable. Use \texttt{async-trait} crate for now.
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}[fragile]{Pinning and Futures}
+  \begin{lstlisting}
+use std::pin::Pin;
+use std::future::Future;
+
+// Manual Future implementation
+struct MyFuture {
+    state: State,
+}
+
+impl Future for MyFuture {
+    type Output = i32;
+
+    fn poll(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>
+    ) -> Poll<Self::Output> {
+        // Poll logic
+        Poll::Ready(42)
+    }
+}
+  \end{lstlisting}
+
+  \textbf{Pin guarantees:} Object won't move in memory, critical for self-referential structures.
+\end{frame}
+
+\begin{frame}[fragile]{Async Cancellation and Select}
+  \begin{lstlisting}
+use tokio::select;
+use tokio::time::{sleep, Duration};
+
+async fn process_with_timeout() -> Result<Data, Error> {
+    select! {
+        result = fetch_data() => {
+            result
+        }
+        _ = sleep(Duration::from_secs(5)) => {
+            Err(Error::Timeout)
+        }
+    }
+}
+
+// Graceful cancellation
+use tokio::sync::CancellationToken;
+
+async fn worker(token: CancellationToken) {
+    loop {
+        select! {
+            _ = token.cancelled() => break,
+            _ = do_work() => {}
+        }
+    }
+}
+  \end{lstlisting}
+\end{frame}
+
+% ============================================
+% PART 5: UNSAFE RUST
+% ============================================
+\section{Unsafe Rust and FFI}
+
+\begin{frame}[fragile]{Unsafe Superpowers}
+  \begin{block}{What \texttt{unsafe} Allows}
+    \begin{itemize}
+      \item Dereference raw pointers
+      \item Call unsafe functions
+      \item Access/modify mutable statics
+      \item Implement unsafe traits
+      \item Access union fields
+    \end{itemize}
+  \end{block}
+
+  \begin{lstlisting}
+// Raw pointers
+let mut num = 5;
+let r1 = &num as *const i32;
+let r2 = &mut num as *mut i32;
+
+unsafe {
+    println!("r1: {}", *r1);
+    *r2 = 10;
+}
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Safe Abstractions over Unsafe Code}
+  \begin{lstlisting}
+pub struct Vec<T> {
+    ptr: *mut T,
+    len: usize,
+    cap: usize,
+}
+
+impl<T> Vec<T> {
+    pub fn push(&mut self, elem: T) {
+        if self.len == self.cap {
+            self.grow();
+        }
+        unsafe {
+            std::ptr::write(
+                self.ptr.add(self.len),
+                elem
+            );
+        }
+        self.len += 1;
+    }
+}
+  \end{lstlisting}
+
+  \textbf{Key Principle:} Unsafe code is encapsulated; public API remains safe.
+\end{frame}
+
+\begin{frame}[fragile]{Foreign Function Interface (FFI)}
+  \begin{lstlisting}
+// Calling C from Rust
+extern "C" {
+    fn abs(input: i32) -> i32;
+}
+
+unsafe {
+    println!("Absolute value: {}", abs(-3));
+}
+
+// Exposing Rust to C
+#[no_mangle]
+pub extern "C" fn rust_function(x: i32) -> i32 {
+    x * 2
+}
+
+// Use repr(C) for C-compatible structs
+#[repr(C)]
+pub struct CPoint {
+    x: i32,
+    y: i32,
+}
+  \end{lstlisting}
+\end{frame}
+
+% ============================================
+% PART 6: PERFORMANCE
+% ============================================
+\section{Performance Optimization}
+
+\begin{frame}[fragile]{Zero-Cost Abstractions}
+  \begin{lstlisting}
+// Iterator chains compile to efficient loops
+let sum: i32 = (1..100)
+    .filter(|x| x % 2 == 0)
+    .map(|x| x * x)
+    .sum();
+
+// Compiles to roughly:
+let mut sum = 0;
+for x in 1..100 {
+    if x % 2 == 0 {
+        sum += x * x;
+    }
+}
+  \end{lstlisting}
+
+  \begin{block}{Inline Optimization}
+    Use \texttt{\#[inline]} and \texttt{\#[inline(always)]} for performance-critical functions.
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Memory Layout and Alignment}
+  \begin{lstlisting}
+use std::mem::{size_of, align_of};
+
+// Control layout with repr
+#[repr(C)]
+struct CLayout { x: u8, y: u32 }
+
+#[repr(packed)]
+struct Packed { x: u8, y: u32 }
+
+#[repr(align(16))]
+struct Aligned { data: [u8; 16] }
+
+println!("CLayout: {} bytes", size_of::<CLayout>());
+println!("Packed: {} bytes", size_of::<Packed>());
+println!("Align: {}", align_of::<Aligned>());
+  \end{lstlisting}
+
+  \textbf{Trade-offs:} Packing reduces size but may reduce performance on some architectures.
+\end{frame}
+
+\begin{frame}[fragile]{SIMD and Platform-Specific Code}
+  \begin{lstlisting}
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
+
+#[target_feature(enable = "avx2")]
+unsafe fn process_avx2(data: &[f32]) -> f32 {
+    // SIMD operations
+    // Process 8 floats at once
+    let mut sum = _mm256_setzero_ps();
+    for chunk in data.chunks_exact(8) {
+        let v = _mm256_loadu_ps(chunk.as_ptr());
+        sum = _mm256_add_ps(sum, v);
+    }
+    // Extract and sum all lanes
+    // ...
+}
+  \end{lstlisting}
+
+  \textbf{Note:} Use portable\_simd for stable Rust or platform-specific intrinsics.
+\end{frame}
+
+% ============================================
+% PART 7: ADVANCED ERROR HANDLING
+% ============================================
+\section{Advanced Error Handling}
+
+\begin{frame}[fragile]{Error Type Design}
+  \begin{lstlisting}
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum AppError {
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+
+    #[error("Invalid input: {field}")]
+    Validation { field: String },
+
+    #[error("Not found: {0}")]
+    NotFound(String),
+
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+  \end{lstlisting}
+
+  \textbf{Best Practices:}
+  \begin{itemize}
+    \item Use \texttt{thiserror} for library errors
+    \item Use \texttt{anyhow} for application errors
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Error Context and Chaining}
+  \begin{lstlisting}
+use anyhow::{Context, Result};
+
+fn process_file(path: &Path) -> Result<Data> {
+    let content = fs::read_to_string(path)
+        .with_context(|| {
+            format!("Failed to read file: {}", path.display())
+        })?;
+
+    parse_content(&content)
+        .context("Failed to parse file content")?;
+
+    Ok(data)
+}
+
+// Error chain provides full context:
+// Error: Failed to parse file content
+// Caused by: Invalid JSON at line 42
+// Caused by: unexpected character '}'
+  \end{lstlisting}
+\end{frame}
+
+% ============================================
+% PART 8: ADVANCED CONCURRENCY
+% ============================================
+\section{Advanced Concurrency Patterns}
+
+\begin{frame}[fragile]{Lock-Free Data Structures}
+  \begin{lstlisting}
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+struct LockFreeCounter {
+    count: AtomicUsize,
+}
+
+impl LockFreeCounter {
+    fn increment(&self) {
+        self.count.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn get(&self) -> usize {
+        self.count.load(Ordering::SeqCst)
+    }
+}
+  \end{lstlisting}
+
+  \textbf{Memory Orderings:}
+  \begin{itemize}
+    \item \texttt{Relaxed}: No synchronization
+    \item \texttt{Acquire/Release}: Synchronize memory operations
+    \item \texttt{SeqCst}: Sequential consistency (strongest)
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Channels and Message Passing Patterns}
+  \begin{lstlisting}
+use tokio::sync::{mpsc, oneshot};
+
+// Multi-producer, single-consumer
+let (tx, mut rx) = mpsc::channel(100);
+
+// Worker pool pattern
+for _ in 0..4 {
+    let tx = tx.clone();
+    tokio::spawn(async move {
+        let result = do_work().await;
+        tx.send(result).await.unwrap();
+    });
+}
+
+// Request-response pattern
+let (resp_tx, resp_rx) = oneshot::channel();
+tx.send(Request { data, resp_tx }).await?;
+let response = resp_rx.await?;
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Actor Pattern}
+  \begin{lstlisting}
+use tokio::sync::mpsc;
+
+struct Actor {
+    receiver: mpsc::Receiver<Message>,
+    state: State,
+}
+
+impl Actor {
+    async fn run(mut self) {
+        while let Some(msg) = self.receiver.recv().await {
+            self.handle_message(msg).await;
+        }
+    }
+
+    async fn handle_message(&mut self, msg: Message) {
+        match msg {
+            Message::DoWork(data) => { /* ... */ }
+            Message::GetState(tx) => {
+                tx.send(self.state.clone()).ok();
+            }
+        }
+    }
+}
+  \end{lstlisting}
+\end{frame}
+
+% ============================================
+% PART 9: TYPE SYSTEM TRICKS
+% ============================================
+\section{Type System Techniques}
+
+\begin{frame}[fragile]{Phantom Types and State Machines}
+  \begin{lstlisting}
+use std::marker::PhantomData;
+
+struct Locked;
+struct Unlocked;
+
+struct Door<State> {
+    _state: PhantomData<State>,
+}
+
+impl Door<Locked> {
+    fn unlock(self) -> Door<Unlocked> {
+        Door { _state: PhantomData }
+    }
+}
+
+impl Door<Unlocked> {
+    fn open(&self) { println!("Door opened!"); }
+    fn lock(self) -> Door<Locked> {
+        Door { _state: PhantomData }
+    }
+}
+
+// Compile-time enforcement!
+// let door = Door::<Locked> { ... };
+// door.open();  // Error! Can't open locked door
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Const Generics}
+  \begin{lstlisting}
+// Fixed-size arrays without macros
+struct Matrix<T, const ROWS: usize, const COLS: usize> {
+    data: [[T; COLS]; ROWS],
+}
+
+impl<T, const R: usize, const C: usize> Matrix<T, R, C> {
+    fn new(data: [[T; C]; R]) -> Self {
+        Matrix { data }
+    }
+}
+
+// Type-safe matrix multiplication
+fn multiply<T, const M: usize, const N: usize, const P: usize>(
+    a: &Matrix<T, M, N>,
+    b: &Matrix<T, N, P>,
+) -> Matrix<T, M, P> {
+    // Implementation
+}
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{GATs - Generic Associated Types}
+  \begin{lstlisting}
+// Unstable/stabilizing feature
+trait LendingIterator {
+    type Item<'a> where Self: 'a;
+
+    fn next<'a>(&'a mut self) -> Option<Self::Item<'a>>;
+}
+
+// Allows lending references with lifetimes tied to self
+struct WindowsMut<'data, T> {
+    data: &'data mut [T],
+    size: usize,
+}
+
+impl<'data, T> LendingIterator for WindowsMut<'data, T> {
+    type Item<'a> = &'a mut [T] where Self: 'a;
+
+    fn next<'a>(&'a mut self) -> Option<Self::Item<'a>> {
+        // Return mutable slice borrowed from self
+    }
+}
+  \end{lstlisting}
+\end{frame}
+
+% ============================================
+% PART 10: SUMMARY
+% ============================================
+\section{Summary and Next Steps}
+
+\begin{frame}{Key Takeaways}
+  \begin{enumerate}
+    \item \textbf{Traits}: Use associated types, object safety, and blanket impls effectively
+    \item \textbf{Lifetimes}: Understand variance and complex lifetime relationships
+    \item \textbf{Macros}: Leverage declarative and procedural macros for code generation
+    \item \textbf{Async}: Master pinning, futures, and async patterns
+    \item \textbf{Unsafe}: Write safe abstractions over unsafe code
+    \item \textbf{Performance}: Use zero-cost abstractions and control memory layout
+    \item \textbf{Concurrency}: Apply lock-free structures and message passing patterns
+    \item \textbf{Type System}: Exploit phantom types, const generics, and GATs
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Advanced Resources}
+  \begin{block}{Books and Guides}
+    \begin{itemize}
+      \item The Rustonomicon (unsafe Rust)
+      \item Rust Performance Book
+      \item Rust Async Book
+      \item Programming Rust (O'Reilly)
+    \end{itemize}
+  \end{block}
+
+  \begin{block}{Practice}
+    \begin{itemize}
+      \item Contribute to open source Rust projects
+      \item Build systems programming projects
+      \item Implement data structures from scratch
+      \item Explore embedded Rust and WebAssembly
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+\begin{frame}{Next Steps}
+  \begin{enumerate}
+    \item \textbf{Specialize}: Choose a domain (systems, web, embedded, etc.)
+    \item \textbf{Deep Dive}: Study source code of major Rust projects
+    \item \textbf{Performance}: Learn profiling and optimization techniques
+    \item \textbf{Ecosystem}: Explore crates ecosystem and contribute
+    \item \textbf{Community}: Join Rust working groups and discussions
+  \end{enumerate}
+
+  \vspace{0.5cm}
+  \begin{center}
+    \Large{\textbf{Keep Building and Learning!}}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Resources}
+  \begin{block}{Official Resources}
+    \begin{itemize}
+      \item The Rustonomicon: \texttt{doc.rust-lang.org/nomicon/}
+      \item Async Book: \texttt{rust-lang.github.io/async-book/}
+      \item Reference: \texttt{doc.rust-lang.org/reference/}
+    \end{itemize}
+  \end{block}
+
+  \begin{block}{Community}
+    \begin{itemize}
+      \item Rust Users Forum
+      \item r/rust on Reddit
+      \item Rust Discord
+      \item This Week in Rust newsletter
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+\end{document}

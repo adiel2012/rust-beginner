@@ -1,0 +1,1124 @@
+\documentclass[11pt,a4paper]{book}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+% Page style
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[RE]{\leftmark}
+\fancyhead[LO]{\rightmark}
+
+% Rust code highlighting
+\lstdefinelanguage{Rust}{
+  keywords={fn, let, mut, if, else, match, for, while, loop, impl, struct, enum, trait, pub, use, mod, return, break, continue, const, static, type, where, self, Self, async, await, unsafe, dyn, Box, Vec, String, Option, Result, Some, None, Ok, Err},
+  keywordstyle=\color{blue}\bfseries,
+  ndkeywords={i32, i64, u32, u64, f32, f64, bool, char, str, usize},
+  ndkeywordstyle=\color{purple}\bfseries,
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{gray}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  morestring=[b]',
+  morestring=[b]"
+}
+
+\lstset{
+  language=Rust,
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  showstringspaces=false,
+  captionpos=b
+}
+
+\title{Advanced Rust Programming\\
+\large Expert-Level Techniques and Internals}
+\author{Rust Learning Series - Advanced Track}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\chapter*{Prerequisites}
+\addcontentsline{toc}{chapter}{Prerequisites}
+
+This book assumes mastery of all intermediate Rust concepts. You should have extensive practical experience with:
+
+\begin{itemize}
+\item \textbf{All Intermediate Topics}: Advanced traits, complex lifetimes, and macro programming
+\item \textbf{Unsafe Rust and FFI}: Comfortable writing unsafe code and interfacing with C
+\item \textbf{Advanced Async Programming}: Understanding futures, pinning, and async runtimes
+\item \textbf{Performance Optimization}: Experience with profiling and optimization techniques
+\item \textbf{Lock-Free Concurrency}: Understanding atomic operations and memory orderings
+\end{itemize}
+
+This book covers expert-level topics including compiler internals, advanced procedural macros, custom allocators, embedded systems programming, WebAssembly, async runtime implementation, advanced lock-free algorithms, language tooling development, performance profiling, and contributing to Rust itself.
+
+\tableofcontents
+
+% ============================================
+% CHAPTER 1: COMPILER INTERNALS AND MIR
+% ============================================
+\chapter{Compiler Internals and MIR}
+
+Understanding Rust's compilation pipeline provides insights into how the language works and enables advanced compiler development.
+
+\section{The Rust Compilation Pipeline}
+
+The Rust compiler (rustc) transforms source code into machine code through several intermediate representations:
+
+\begin{enumerate}
+\item \textbf{Lexing and Parsing}: Source code is tokenized and parsed into an Abstract Syntax Tree (AST)
+\item \textbf{Macro Expansion}: Macros are expanded to generate more AST nodes
+\item \textbf{HIR (High-level IR)}: AST is lowered to a more compiler-friendly representation
+\item \textbf{Type Checking and Inference}: Type information is inferred and checked
+\item \textbf{MIR (Mid-level IR)}: HIR is lowered to MIR for borrow checking and optimization
+\item \textbf{Borrow Checking}: MIR is analyzed to enforce borrowing rules
+\item \textbf{Optimization}: Various optimizations are applied to MIR
+\item \textbf{LLVM IR}: MIR is translated to LLVM's intermediate representation
+\item \textbf{Machine Code}: LLVM generates architecture-specific machine code
+\end{enumerate}
+
+\section{Working with MIR}
+
+Mid-level Intermediate Representation (MIR) is crucial for borrow checking and optimization. You can inspect MIR for your functions:
+
+\begin{lstlisting}
+// View MIR for a function
+#[rustc_dump_mir(before = "all", after = "all")]
+fn example(x: i32) -> i32 {
+    x * 2 + 1
+}
+\end{lstlisting}
+
+\subsection{MIR Structure}
+
+MIR represents functions as control flow graphs with basic blocks:
+
+\begin{lstlisting}
+// Simplified MIR representation
+fn example(_1: i32) -> i32 {
+    let mut _0: i32;
+    let mut _2: i32;
+    let mut _3: i32;
+
+    bb0: {
+        _2 = _1;
+        _3 = const 2_i32;
+        _2 = Mul(move _2, move _3);
+        _3 = const 1_i32;
+        _0 = Add(move _2, move _3);
+        return;
+    }
+}
+\end{lstlisting}
+
+MIR is used for:
+\begin{itemize}
+\item \textbf{Borrow Checking}: Ensuring ownership and borrowing rules
+\item \textbf{Optimization}: Performing transformations that preserve semantics
+\item \textbf{Const Evaluation}: Computing compile-time constants
+\end{itemize}
+
+\section{Compiler Plugins and Custom Lints}
+
+You can extend rustc with custom lints:
+
+\begin{lstlisting}
+#![feature(rustc_private)]
+extern crate rustc_lint;
+extern crate rustc_middle;
+
+use rustc_lint::{LateContext, LateLintPass, LintContext};
+
+declare_lint! {
+    pub CUSTOM_LINT,
+    Warn,
+    "description of custom lint"
+}
+
+impl<'tcx> LateLintPass<'tcx> for CustomLint {
+    fn check_expr(&mut self, cx: &LateContext<'tcx>, expr: &Expr) {
+        // Custom lint logic
+        // Analyze expressions and emit warnings
+    }
+}
+\end{lstlisting}
+
+Custom lints enable enforcement of project-specific coding standards and detection of anti-patterns.
+
+% ============================================
+% CHAPTER 2: ADVANCED PROCEDURAL MACROS
+% ============================================
+\chapter{Advanced Procedural Macros}
+
+Procedural macros enable powerful compile-time metaprogramming. Advanced techniques allow you to create complex code generation.
+
+\section{Complex Derive Macros}
+
+Derive macros automatically implement traits. Building sophisticated derive macros requires parsing attributes and generating complex code:
+
+\begin{lstlisting}
+#[proc_macro_derive(Builder, attributes(builder))]
+pub fn derive_builder(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    let name = &input.ident;
+    let builder_name = format_ident!("{}Builder", name);
+
+    let fields = match &input.data {
+        Data::Struct(data) => &data.fields,
+        _ => panic!("Builder only works on structs"),
+    };
+
+    // Generate builder methods for each field
+    let methods = fields.iter().map(|f| {
+        let field_name = &f.ident;
+        let field_type = &f.ty;
+        quote! {
+            pub fn #field_name(mut self, value: #field_type) -> Self {
+                self.#field_name = Some(value);
+                self
+            }
+        }
+    });
+
+    // Generate the builder struct and implementation
+    // ... more complex logic
+}
+\end{lstlisting}
+
+\section{Parsing Custom Syntax}
+
+The \texttt{syn} crate enables parsing arbitrary syntax:
+
+\begin{lstlisting}
+use syn::{parse::Parse, Token};
+
+struct MyMacroInput {
+    name: Ident,
+    _arrow: Token![=>],
+    value: Expr,
+}
+
+impl Parse for MyMacroInput {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(MyMacroInput {
+            name: input.parse()?,
+            _arrow: input.parse()?,
+            value: input.parse()?,
+        })
+    }
+}
+
+#[proc_macro]
+pub fn my_macro(input: TokenStream) -> TokenStream {
+    let parsed = parse_macro_input!(input as MyMacroInput);
+    // Use parsed.name and parsed.value to generate code
+}
+\end{lstlisting}
+
+\section{Hygiene and Span Management}
+
+Macro hygiene prevents identifier conflicts. Span management enables precise error reporting:
+
+\begin{lstlisting}
+use proc_macro::Span;
+use quote::quote_spanned;
+
+fn generate_with_span(span: Span) -> TokenStream {
+    quote_spanned! {span=>
+        compile_error!("Error at original location");
+    }.into()
+}
+
+// Preserve spans for better error messages
+let tokens = quote_spanned! {field.span()=>
+    self.#field_name = value;
+};
+\end{lstlisting}
+
+Macro-generated identifiers automatically avoid conflicts with user code, but you can control scoping when necessary.
+
+% ============================================
+% CHAPTER 3: CUSTOM ALLOCATORS
+% ============================================
+\chapter{Custom Allocators}
+
+Custom allocators provide control over memory management for specialized use cases.
+
+\section{The GlobalAlloc Trait}
+
+Implement custom allocators using \texttt{GlobalAlloc}:
+
+\begin{lstlisting}
+use std::alloc::{GlobalAlloc, Layout, System};
+
+struct MyAllocator;
+
+unsafe impl GlobalAlloc for MyAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        println!("Allocating {} bytes", layout.size());
+        System.alloc(layout)
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        println!("Deallocating {} bytes", layout.size());
+        System.dealloc(ptr, layout)
+    }
+}
+
+#[global_allocator]
+static ALLOCATOR: MyAllocator = MyAllocator;
+\end{lstlisting}
+
+\section{Arena Allocators}
+
+Arena allocators provide fast bulk allocation and deallocation:
+
+\begin{lstlisting}
+struct Arena {
+    buf: Vec<u8>,
+    offset: usize,
+}
+
+impl Arena {
+    fn alloc<T>(&mut self, value: T) -> &mut T {
+        let layout = Layout::new::<T>();
+        let offset = self.offset;
+        self.offset += layout.size();
+
+        unsafe {
+            let ptr = self.buf.as_mut_ptr().add(offset) as *mut T;
+            ptr.write(value);
+            &mut *ptr
+        }
+    }
+
+    fn reset(&mut self) {
+        self.offset = 0;
+        // No individual drops - bulk deallocation
+    }
+}
+\end{lstlisting}
+
+Arena allocators excel when you allocate many objects with similar lifetimes and deallocate them all at once.
+
+\section{Per-Collection Allocators}
+
+The \texttt{allocator\_api} feature enables per-collection custom allocators:
+
+\begin{lstlisting}
+#![feature(allocator_api)]
+
+use std::alloc::Allocator;
+
+struct BumpAllocator { /* ... */ }
+
+unsafe impl Allocator for BumpAllocator {
+    fn allocate(&self, layout: Layout)
+        -> Result<NonNull<[u8]>, AllocError>
+    {
+        // Bump allocation logic
+    }
+
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        // No-op for bump allocator
+    }
+}
+
+// Use with collections
+let vec: Vec<i32, BumpAllocator> = Vec::new_in(bump_allocator);
+\end{lstlisting}
+
+% ============================================
+% CHAPTER 4: NO-STD AND EMBEDDED SYSTEMS
+% ============================================
+\chapter{No-Std and Embedded Systems}
+
+Rust's no-std mode enables bare-metal programming for embedded systems and operating system kernels.
+
+\section{No-Std Fundamentals}
+
+In no-std environments, you don't have access to the standard library:
+
+\begin{lstlisting}
+#![no_std]
+#![no_main]
+
+use core::panic::PanicInfo;
+
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    loop {}
+}
+
+#[no_mangle]
+pub extern "C" fn _start() -> ! {
+    // Entry point for bare metal
+    loop {}
+}
+
+// Use core instead of std
+use core::ptr;
+use core::mem;
+\end{lstlisting}
+
+No-std environments have no heap allocation, no operating system services, and minimal runtime support.
+
+\section{Embedded HAL}
+
+The Hardware Abstraction Layer enables portable embedded code:
+
+\begin{lstlisting}
+use embedded_hal::digital::v2::OutputPin;
+
+struct Led<P: OutputPin> {
+    pin: P,
+}
+
+impl<P: OutputPin> Led<P> {
+    fn on(&mut self) -> Result<(), P::Error> {
+        self.pin.set_high()
+    }
+
+    fn off(&mut self) -> Result<(), P::Error> {
+        self.pin.set_low()
+    }
+}
+
+// Works with any GPIO implementation
+let mut led = Led { pin: gpio_pin };
+led.on().unwrap();
+\end{lstlisting}
+
+\section{Volatile Memory Access}
+
+Memory-mapped I/O requires volatile operations:
+
+\begin{lstlisting}
+use core::ptr::{read_volatile, write_volatile};
+
+// Memory-mapped IO
+const GPIO_BASE: usize = 0x4000_0000;
+
+#[repr(C)]
+struct GpioRegisters {
+    data: u32,
+    direction: u32,
+    interrupt: u32,
+}
+
+fn set_gpio(bit: u8) {
+    unsafe {
+        let gpio = GPIO_BASE as *mut GpioRegisters;
+        let mut data = read_volatile(&(*gpio).data);
+        data |= 1 << bit;
+        write_volatile(&mut (*gpio).data, data);
+    }
+}
+\end{lstlisting}
+
+Volatile operations prevent compiler optimizations that would be incorrect for hardware registers.
+
+\section{Interrupt Handling}
+
+Embedded systems use interrupts for asynchronous events:
+
+\begin{lstlisting}
+use cortex_m_rt::interrupt;
+
+#[interrupt]
+fn TIM2() {
+    // Timer 2 interrupt handler
+    static mut COUNT: u32 = 0;
+
+    unsafe {
+        *COUNT += 1;
+        // Clear interrupt flag
+        (*TIM2::ptr()).sr.modify(|_, w| w.uif().clear_bit());
+    }
+}
+
+// Configure interrupt
+unsafe {
+    cortex_m::peripheral::NVIC::unmask(Interrupt::TIM2);
+}
+\end{lstlisting}
+
+% ============================================
+% CHAPTER 5: WEBASSEMBLY DEEP DIVE
+% ============================================
+\chapter{WebAssembly Deep Dive}
+
+WebAssembly enables running Rust code in web browsers with near-native performance.
+
+\section{Wasm Bindgen}
+
+The \texttt{wasm-bindgen} tool generates JavaScript bindings:
+
+\begin{lstlisting}
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub fn fibonacci(n: u32) -> u32 {
+    match n {
+        0 => 0,
+        1 => 1,
+        _ => fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
+#[wasm_bindgen]
+pub fn greet(name: &str) {
+    log(&format!("Hello, {}!", name));
+}
+\end{lstlisting}
+
+\section{JavaScript Interoperability}
+
+The \texttt{web-sys} crate provides Web API bindings:
+
+\begin{lstlisting}
+use wasm_bindgen::JsCast;
+use web_sys::{Document, Element, HtmlElement};
+
+#[wasm_bindgen(start)]
+pub fn main() -> Result<(), JsValue> {
+    let window = web_sys::window().unwrap();
+    let document = window.document().unwrap();
+
+    let body = document.body().unwrap();
+    let div = document.create_element("div")?;
+    div.set_inner_html("Hello from Rust!");
+
+    body.append_child(&div)?;
+    Ok(())
+}
+\end{lstlisting}
+
+\section{Optimizing WebAssembly Size}
+
+Size optimization is crucial for web delivery:
+
+\begin{lstlisting}
+# Cargo.toml
+[profile.release]
+opt-level = "z"          # Optimize for size
+lto = true               # Link-time optimization
+codegen-units = 1        # Better optimization
+panic = "abort"          # Smaller binary
+strip = true             # Strip symbols
+\end{lstlisting}
+
+Additional techniques:
+\begin{itemize}
+\item Avoid formatting macros in release builds
+\item Use \texttt{wee\_alloc} for smaller allocator
+\item Tree-shake with \texttt{wasm-gc}
+\item Post-process with \texttt{wasm-opt}
+\end{itemize}
+
+% ============================================
+% CHAPTER 6: ASYNC RUNTIME INTERNALS
+% ============================================
+\chapter{Async Runtime Internals}
+
+Building custom async runtimes provides deep understanding of how async works in Rust.
+
+\section{Building a Simple Executor}
+
+An executor polls futures to completion:
+
+\begin{lstlisting}
+use std::future::Future;
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+
+struct SimpleExecutor {
+    tasks: Vec<Pin<Box<dyn Future<Output = ()>>>>,
+}
+
+impl SimpleExecutor {
+    fn run(&mut self) {
+        while !self.tasks.is_empty() {
+            self.tasks.retain_mut(|task| {
+                let waker = create_waker();
+                let mut cx = Context::from_waker(&waker);
+
+                match task.as_mut().poll(&mut cx) {
+                    Poll::Ready(()) => false,  // Remove
+                    Poll::Pending => true,     // Keep
+                }
+            });
+        }
+    }
+}
+\end{lstlisting}
+
+\section{Waker Implementation}
+
+Wakers notify the executor when futures are ready:
+
+\begin{lstlisting}
+fn create_waker() -> Waker {
+    unsafe fn clone(ptr: *const ()) -> RawWaker {
+        RawWaker::new(ptr, &VTABLE)
+    }
+
+    unsafe fn wake(_: *const ()) {
+        // Wake the task
+    }
+
+    unsafe fn wake_by_ref(_: *const ()) {
+        // Wake without consuming
+    }
+
+    unsafe fn drop(_: *const ()) {}
+
+    static VTABLE: RawWakerVTable = RawWakerVTable::new(
+        clone, wake, wake_by_ref, drop
+    );
+
+    let raw = RawWaker::new(std::ptr::null(), &VTABLE);
+    unsafe { Waker::from_raw(raw) }
+}
+\end{lstlisting}
+
+\section{Reactor Pattern}
+
+Reactors handle I/O events:
+
+\begin{lstlisting}
+use mio::{Events, Interest, Poll, Token};
+
+struct Reactor {
+    poll: Poll,
+    events: Events,
+    handlers: HashMap<Token, Box<dyn FnMut()>>,
+}
+
+impl Reactor {
+    fn register<S: Source>(&mut self, source: &mut S,
+                           handler: impl FnMut() + 'static)
+    {
+        let token = Token(self.handlers.len());
+        self.poll.registry()
+            .register(source, token, Interest::READABLE)
+            .unwrap();
+        self.handlers.insert(token, Box::new(handler));
+    }
+
+    fn run(&mut self) {
+        loop {
+            self.poll.poll(&mut self.events, None).unwrap();
+            for event in &self.events {
+                if let Some(handler) = self.handlers.get_mut(&event.token()) {
+                    handler();
+                }
+            }
+        }
+    }
+}
+\end{lstlisting}
+
+% ============================================
+% CHAPTER 7: ADVANCED LOCK-FREE ALGORITHMS
+% ============================================
+\chapter{Advanced Lock-Free Algorithms}
+
+Lock-free data structures enable high-performance concurrent programming without locks.
+
+\section{The ABA Problem}
+
+Lock-free algorithms using compare-and-swap can suffer from the ABA problem:
+
+\begin{lstlisting}
+use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
+
+struct Node<T> {
+    data: T,
+    next: *mut Node<T>,
+}
+
+struct Stack<T> {
+    head: AtomicPtr<Node<T>>,
+}
+
+impl<T> Stack<T> {
+    fn push(&self, data: T) {
+        let node = Box::into_raw(Box::new(Node {
+            data,
+            next: std::ptr::null_mut(),
+        }));
+
+        loop {
+            let head = self.head.load(Ordering::Acquire);
+            unsafe { (*node).next = head; }
+
+            if self.head.compare_exchange(
+                head, node,
+                Ordering::Release, Ordering::Acquire
+            ).is_ok() {
+                break;
+            }
+        }
+    }
+}
+\end{lstlisting}
+
+\section{Tagged Pointers}
+
+Tagged pointers solve the ABA problem by including a version counter:
+
+\begin{lstlisting}
+// Pack counter with pointer
+struct Tagged<T> {
+    ptr: usize,  // Bottom bits: counter, top bits: pointer
+}
+
+impl<T> Tagged<T> {
+    fn new(ptr: *mut T, tag: usize) -> Self {
+        let addr = ptr as usize;
+        Tagged { ptr: addr | (tag & 0xFFFF) }
+    }
+
+    fn get_ptr(&self) -> *mut T {
+        (self.ptr & !0xFFFF) as *mut T
+    }
+
+    fn get_tag(&self) -> usize {
+        self.ptr & 0xFFFF
+    }
+}
+
+// Use AtomicUsize for tagged pointer
+struct AbaFreeStack<T> {
+    head: AtomicUsize,
+}
+\end{lstlisting}
+
+\section{Epoch-Based Reclamation}
+
+The \texttt{crossbeam-epoch} crate provides safe memory reclamation:
+
+\begin{lstlisting}
+use crossbeam_epoch::{self as epoch, Atomic, Owned};
+
+struct Node<T> {
+    data: T,
+    next: Atomic<Node<T>>,
+}
+
+struct Stack<T> {
+    head: Atomic<Node<T>>,
+}
+
+impl<T> Stack<T> {
+    fn push(&self, data: T) {
+        let node = Owned::new(Node {
+            data,
+            next: Atomic::null(),
+        });
+
+        let guard = epoch::pin();
+        loop {
+            let head = self.head.load(Ordering::Acquire, &guard);
+            node.next.store(head, Ordering::Relaxed);
+
+            if self.head.compare_exchange(
+                head, node,
+                Ordering::Release, Ordering::Acquire, &guard
+            ).is_ok() {
+                break;
+            }
+        }
+    }
+}
+\end{lstlisting}
+
+% ============================================
+% CHAPTER 8: BUILDING LANGUAGE TOOLING
+% ============================================
+\chapter{Building Language Tooling}
+
+Creating tools for Rust development enhances the ecosystem and provides deep language understanding.
+
+\section{Using rust-analyzer APIs}
+
+The \texttt{rust-analyzer} APIs enable code analysis:
+
+\begin{lstlisting}
+use ra_ap_syntax::{ast, AstNode, SyntaxKind};
+use ra_ap_ide::{Analysis, AnalysisHost, FileId};
+
+fn analyze_code(source: &str) -> Vec<String> {
+    let parse = ast::SourceFile::parse(source);
+    let root = parse.tree();
+
+    let mut functions = Vec::new();
+
+    for node in root.syntax().descendants() {
+        if let Some(func) = ast::Fn::cast(node) {
+            if let Some(name) = func.name() {
+                functions.push(name.to_string());
+            }
+        }
+    }
+
+    functions
+}
+\end{lstlisting}
+
+\section{Custom Cargo Subcommands}
+
+Cargo subcommands extend Cargo's functionality:
+
+\begin{lstlisting}
+// cargo-mycmd/src/main.rs
+use clap::Parser;
+
+#[derive(Parser)]
+#[command(name = "cargo")]
+#[command(bin_name = "cargo")]
+enum Cargo {
+    Mycmd(Args),
+}
+
+#[derive(Parser)]
+struct Args {
+    #[arg(long)]
+    verbose: bool,
+}
+
+fn main() {
+    let Cargo::Mycmd(args) = Cargo::parse();
+
+    // Access cargo metadata
+    let metadata = cargo_metadata::MetadataCommand::new()
+        .exec()
+        .unwrap();
+
+    // Implement custom logic
+}
+\end{lstlisting}
+
+Install as \texttt{cargo-mycmd} and invoke with \texttt{cargo mycmd}.
+
+\section{LSP Server Implementation}
+
+Language Server Protocol enables IDE integration:
+
+\begin{lstlisting}
+use tower_lsp::{LspService, Server};
+use tower_lsp::lsp_types::*;
+
+struct Backend;
+
+#[tower_lsp::async_trait]
+impl LanguageServer for Backend {
+    async fn initialize(&self, _: InitializeParams)
+        -> Result<InitializeResult>
+    {
+        Ok(InitializeResult {
+            capabilities: ServerCapabilities {
+                text_document_sync: Some(
+                    TextDocumentSyncCapability::Kind(
+                        TextDocumentSyncKind::FULL
+                    )
+                ),
+                completion_provider: Some(CompletionOptions::default()),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    }
+
+    async fn completion(&self, _: CompletionParams)
+        -> Result<Option<CompletionResponse>>
+    {
+        // Provide completions
+    }
+}
+\end{lstlisting}
+
+% ============================================
+% CHAPTER 9: PERFORMANCE PROFILING
+% ============================================
+\chapter{Performance Profiling and Optimization}
+
+Profiling identifies bottlenecks and guides optimization efforts.
+
+\section{Benchmarking with Criterion}
+
+Criterion provides statistical benchmarking:
+
+\begin{lstlisting}
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+fn fibonacci_benchmark(c: &mut Criterion) {
+    c.bench_function("fib 20", |b| {
+        b.iter(|| fibonacci(black_box(20)))
+    });
+
+    c.bench_function("fib_iterative 20", |b| {
+        b.iter(|| fib_iterative(black_box(20)))
+    });
+}
+
+criterion_group!(benches, fibonacci_benchmark);
+criterion_main!(benches);
+\end{lstlisting}
+
+Criterion features:
+\begin{itemize}
+\item Statistical analysis
+\item HTML reports with plots
+\item Comparison across runs
+\end{itemize}
+
+\section{CPU Profiling}
+
+Various tools provide CPU profiling:
+
+\begin{verbatim}
+# Using perf on Linux
+$ cargo build --release
+$ perf record --call-graph=dwarf ./target/release/myapp
+$ perf report
+
+# Using flamegraph
+$ cargo install flamegraph
+$ cargo flamegraph
+
+# Using samply (modern alternative)
+$ cargo install samply
+$ samply record ./target/release/myapp
+\end{verbatim}
+
+\subsection{Profile-Guided Optimization}
+
+PGO optimizes based on actual runtime profiles:
+
+\begin{verbatim}
+# 1. Build with instrumentation
+RUSTFLAGS="-Cprofile-generate=/tmp/pgo" cargo build --release
+
+# 2. Run typical workloads
+./target/release/myapp < typical_input.txt
+
+# 3. Rebuild with profile data
+RUSTFLAGS="-Cprofile-use=/tmp/pgo" cargo build --release
+\end{verbatim}
+
+\section{Memory Profiling}
+
+Memory profiling identifies allocation patterns:
+
+\begin{lstlisting}
+// Using dhat for heap profiling
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
+fn main() {
+    let _profiler = dhat::Profiler::new_heap();
+
+    // Your code here
+    let v: Vec<u64> = (0..1_000_000).collect();
+
+    // Profiler drops, generating report
+}
+\end{lstlisting}
+
+Valgrind provides another approach:
+
+\begin{verbatim}
+$ valgrind --tool=massif ./target/release/myapp
+$ ms_print massif.out.12345
+\end{verbatim}
+
+% ============================================
+% CHAPTER 10: CONTRIBUTING TO RUST
+% ============================================
+\chapter{Contributing to Rust Itself}
+
+Contributing to Rust deepens your understanding and benefits the entire ecosystem.
+
+\section{Rust Compiler Development}
+
+Building rustc from source:
+
+\begin{verbatim}
+# Clone and build rustc
+$ git clone https://github.com/rust-lang/rust.git
+$ cd rust
+$ ./x.py build
+
+# Run tests
+$ ./x.py test
+
+# Build specific component
+$ ./x.py build library/std
+
+# Build documentation
+$ ./x.py doc
+\end{verbatim}
+
+Key areas for contribution:
+\begin{itemize}
+\item \textbf{Compiler}: Type checking, borrow checking, MIR
+\item \textbf{Standard Library}: Core, alloc, std
+\item \textbf{Cargo}: Build system and package manager
+\item \textbf{Rustdoc}: Documentation generator
+\item \textbf{Clippy}: Linter
+\end{itemize}
+
+\section{The RFC Process}
+
+Rust uses RFCs (Requests for Comments) for significant changes:
+
+\begin{enumerate}
+\item \textbf{Idea}: Discuss on internals.rust-lang.org
+\item \textbf{RFC}: Submit RFC with detailed design
+\item \textbf{Discussion}: Community reviews and suggests changes
+\item \textbf{FCP}: Final Comment Period (10 days)
+\item \textbf{Merge}: RFC accepted, implementation begins
+\item \textbf{Implementation}: Write code, tests, documentation
+\item \textbf{Stabilization}: Feature gate removal after testing
+\end{enumerate}
+
+\section{Writing Compiler Tests}
+
+Rustc uses comprehensive test suites:
+
+\begin{lstlisting}
+// tests/ui/my-feature.rs
+fn main() {
+    let x: i32 = "hello"; //~ ERROR mismatched types
+}
+\end{lstlisting}
+
+Running tests:
+
+\begin{verbatim}
+# Run specific test
+$ ./x.py test tests/ui/my-feature.rs
+
+# Update expected output
+$ ./x.py test tests/ui --bless
+\end{verbatim}
+
+Test types:
+\begin{itemize}
+\item \texttt{ui}: Compiler error/warning tests
+\item \texttt{compile-fail}: Tests that should fail compilation
+\item \texttt{run-pass}: Tests that should compile and run
+\item \texttt{incremental}: Incremental compilation tests
+\end{itemize}
+
+% ============================================
+% CHAPTER 11: SUMMARY AND MASTERY PATH
+% ============================================
+\chapter{Summary and Mastery Path}
+
+\section{Key Takeaways}
+
+This book has covered expert-level Rust topics:
+
+\begin{enumerate}
+\item \textbf{Compiler Internals}: Understanding MIR and the compilation pipeline
+\item \textbf{Procedural Macros}: Mastering complex code generation
+\item \textbf{Custom Allocators}: Implementing specialized memory management
+\item \textbf{No-Std Programming}: Building for embedded and bare metal
+\item \textbf{WebAssembly}: Deploying Rust to the web
+\item \textbf{Async Runtimes}: Building custom executors and reactors
+\item \textbf{Lock-Free Algorithms}: Implementing advanced concurrent data structures
+\item \textbf{Language Tooling}: Creating tools for Rust development
+\item \textbf{Performance Profiling}: Optimizing for maximum performance
+\item \textbf{Contributing to Rust}: Giving back to the ecosystem
+\end{enumerate}
+
+\section{Mastery Projects}
+
+Challenge yourself with expert-level projects:
+
+\begin{itemize}
+\item Build a custom async runtime
+\item Implement a garbage collector
+\item Create a programming language in Rust
+\item Write an operating system kernel
+\item Build a database engine from scratch
+\item Implement a JIT compiler
+\item Create embedded firmware for real hardware
+\item Contribute features to rustc or cargo
+\end{itemize}
+
+\section{Advanced Resources}
+
+\subsection{Books and Documentation}
+
+\begin{itemize}
+\item \textbf{Rustc Dev Guide}: \texttt{rustc-dev-guide.rust-lang.org}
+\item \textbf{Embedded Rust Book}: \texttt{docs.rust-embedded.org}
+\item \textbf{Rust and WebAssembly Book}: \texttt{rustwasm.github.io}
+\item \textbf{Rust Forge}: \texttt{forge.rust-lang.org}
+\end{itemize}
+
+\subsection{Research and Papers}
+
+\begin{itemize}
+\item Lock-free algorithms and data structures
+\item Memory models and concurrency
+\item Type system theory
+\item Compiler optimization techniques
+\end{itemize}
+
+\subsection{Communities}
+
+\begin{itemize}
+\item \textbf{Zulip}: \texttt{rust-lang.zulipchat.com} - Real-time chat
+\item \textbf{Internals Forum}: \texttt{internals.rust-lang.org} - Design discussions
+\item \textbf{GitHub}: \texttt{github.com/rust-lang} - Source code
+\item \textbf{Working Groups}: Async, embedded, WebAssembly, compiler
+\item \textbf{This Week in Rust}: Weekly newsletter
+\end{itemize}
+
+\section{The Complete Journey}
+
+You've completed the full Rust learning path from beginner to expert:
+
+\begin{itemize}
+\item \textbf{Beginner}: Fundamentals of ownership, types, and basic patterns
+\item \textbf{Intermediate}: Advanced traits, lifetimes, macros, and async
+\item \textbf{Advanced}: Compiler internals, systems programming, and ecosystem contribution
+\end{itemize}
+
+\section{Conclusion}
+
+Congratulations on reaching expert level! You're now equipped to:
+\begin{itemize}
+\item Build production systems in Rust
+\item Contribute to the Rust compiler and ecosystem
+\item Tackle the most challenging programming problems
+\item Mentor others in their Rust journey
+\end{itemize}
+
+The Rust community is welcoming and collaborative. Whether you're optimizing performance-critical code, building reliable systems, exploring language design, or teaching others, your expertise is valuable.
+
+\textbf{Keep exploring, keep building, and keep contributing!}
+
+\end{document}

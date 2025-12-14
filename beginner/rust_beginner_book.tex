@@ -1,0 +1,849 @@
+\documentclass[11pt,a4paper]{book}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+% Page style
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[RE]{\leftmark}
+\fancyhead[LO]{\rightmark}
+
+% Rust code highlighting
+\lstdefinelanguage{Rust}{
+  keywords={fn, let, mut, if, else, match, for, while, loop, impl, struct, enum, trait, pub, use, mod, return, break, continue, const, static, type, where, self, Self, async, await, unsafe, dyn, Box, Vec, String, Option, Result, Some, None, Ok, Err},
+  keywordstyle=\color{blue}\bfseries,
+  ndkeywords={i32, i64, u32, u64, f32, f64, bool, char, str, usize},
+  ndkeywordstyle=\color{purple}\bfseries,
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{gray}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  morestring=[b]',
+  morestring=[b]"
+}
+
+\lstset{
+  language=Rust,
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  showstringspaces=false,
+  captionpos=b
+}
+
+\title{Learning Rust: A Beginner's Guide\\
+\large From Zero to Rustacean}
+\author{Rust Tutorial Series}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+% ============================================
+% CHAPTER 1: GETTING STARTED
+% ============================================
+\chapter{Getting Started with Rust}
+
+\section{What is Rust?}
+
+Rust is a systems programming language that focuses on three key pillars: safety, speed, and concurrency. Unlike many other programming languages, Rust achieves memory safety without requiring a garbage collector, making it an excellent choice for systems programming where performance is critical.
+
+\subsection{Core Features}
+
+\textbf{Safety:} Rust provides memory safety without garbage collection through its innovative ownership system. This eliminates entire classes of bugs at compile time, including null pointer dereferences, buffer overflows, and data races.
+
+\textbf{Speed:} Rust's performance is comparable to C and C++. It provides zero-cost abstractions, meaning you can use high-level features without sacrificing runtime performance.
+
+\textbf{Concurrency:} Rust's type system and ownership model enable fearless concurrent programming. The compiler prevents data races at compile time, making it safe to write multi-threaded code.
+
+Created by Mozilla Research, Rust has been voted the "most loved programming language" in Stack Overflow's developer surveys for several consecutive years, reflecting the strong appreciation developers have for its innovative approach to systems programming.
+
+\section{Why Learn Rust?}
+
+There are several compelling reasons to learn Rust:
+
+\begin{enumerate}
+\item \textbf{Memory Safety:} Rust eliminates null pointers and prevents data races through its ownership and borrowing system. These guarantees are enforced at compile time, meaning many bugs are caught before your code ever runs.
+
+\item \textbf{Zero-Cost Abstractions:} You can use high-level programming features without runtime overhead. The abstractions compile down to code as efficient as if you had written it by hand in a lower-level language.
+
+\item \textbf{Growing Ecosystem:} Rust comes with Cargo, an excellent package manager and build system. The Rust ecosystem includes a rich collection of libraries (called "crates") for everything from web development to embedded systems.
+
+\item \textbf{Career Opportunities:} There is high demand for Rust developers in systems programming, web services, blockchain, embedded systems, and more. Companies like Mozilla, Dropbox, Amazon, Microsoft, and Google use Rust in production.
+
+\item \textbf{Great Tooling:} Rust provides excellent compiler error messages that help you understand and fix problems. The language includes built-in testing support, documentation tools, and a formatter.
+\end{enumerate}
+
+\section{Your First Rust Program}
+
+Let's start with the traditional "Hello, World!" program:
+
+\begin{lstlisting}
+fn main() {
+    println!("Hello, World!");
+}
+\end{lstlisting}
+
+This simple program demonstrates several key elements of Rust:
+
+\begin{itemize}
+\item \texttt{fn main()} is the entry point of every Rust program. When you run a Rust program, execution begins with the \texttt{main} function.
+\item \texttt{println!} is a macro (note the exclamation mark \texttt{!}). Macros are a powerful feature in Rust that allow code generation at compile time.
+\item Statements in Rust typically end with semicolons (\texttt{;}).
+\end{itemize}
+
+\section{Installing Rust}
+
+Installing Rust is straightforward using \texttt{rustup}, the official Rust installer and version management tool. Visit \texttt{rustup.rs} and run the following command:
+
+\begin{verbatim}
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+\end{verbatim}
+
+This command downloads and runs the installer script. Follow the on-screen instructions to complete the installation.
+
+After installation, verify that Rust is correctly installed by checking the versions of the Rust compiler and Cargo:
+
+\begin{verbatim}
+rustc --version
+cargo --version
+\end{verbatim}
+
+If both commands display version information, you're ready to start programming in Rust!
+
+% ============================================
+% CHAPTER 2: BASIC SYNTAX AND CONCEPTS
+% ============================================
+\chapter{Basic Syntax and Concepts}
+
+\section{Variables and Mutability}
+
+One of Rust's distinctive features is that variables are immutable by default. This design choice encourages writing safer, more predictable code.
+
+\subsection{Immutable Variables}
+
+When you declare a variable with \texttt{let}, it is immutable:
+
+\begin{lstlisting}
+let x = 5;
+// x = 6;  // ERROR! Cannot assign twice to immutable variable
+\end{lstlisting}
+
+Attempting to change \texttt{x} after its initial assignment will result in a compilation error.
+
+\subsection{Mutable Variables}
+
+If you need to change a variable's value, you must explicitly declare it as mutable using the \texttt{mut} keyword:
+
+\begin{lstlisting}
+let mut y = 5;
+y = 6;  // OK!
+println!("y = {}", y);
+\end{lstlisting}
+
+This explicit declaration makes it clear which variables can change throughout your program, improving code readability and making bugs easier to catch.
+
+\section{Data Types}
+
+Rust is a statically typed language, meaning it must know the types of all variables at compile time. However, the compiler can often infer types from the context.
+
+\subsection{Scalar Types}
+
+Scalar types represent a single value. Rust has four primary scalar types:
+
+\begin{lstlisting}
+// Integer types (signed and unsigned)
+let a: i32 = 42;      // 32-bit signed integer
+let b: u64 = 100;     // 64-bit unsigned integer
+
+// Floating-point types
+let c: f64 = 3.14;    // 64-bit floating-point
+
+// Boolean type
+let d: bool = true;   // true or false
+
+// Character type
+let e: char = 'R';    // Unicode scalar value
+\end{lstlisting}
+
+\subsection{Compound Types}
+
+Compound types can group multiple values. Rust has two primitive compound types:
+
+\textbf{Tuples:} Group together values of different types:
+
+\begin{lstlisting}
+let tup = (500, 6.4, 'x');
+let (x, y, z) = tup;  // Destructuring
+\end{lstlisting}
+
+\textbf{Arrays:} Fixed-length collections of values of the same type:
+
+\begin{lstlisting}
+let arr = [1, 2, 3, 4, 5];
+let first = arr[0];    // Indexing starts at 0
+\end{lstlisting}
+
+\section{Functions}
+
+Functions are fundamental building blocks in Rust. They are declared using the \texttt{fn} keyword.
+
+\begin{lstlisting}
+fn add(a: i32, b: i32) -> i32 {
+    a + b  // Expression (no semicolon) - this is the return value
+}
+
+fn subtract(a: i32, b: i32) -> i32 {
+    return a - b;  // Explicit return statement
+}
+
+fn main() {
+    println!("5 + 3 = {}", add(5, 3));
+    println!("10 - 4 = {}", subtract(10, 4));
+}
+\end{lstlisting}
+
+Note that in Rust, the last expression in a function is automatically returned if there's no semicolon. You can also use the \texttt{return} keyword for early returns or when you prefer explicit return statements.
+
+\section{Control Flow}
+
+\subsection{if/else Expressions}
+
+Rust's \texttt{if} expressions allow branching based on conditions:
+
+\begin{lstlisting}
+fn main() {
+    let number = 7;
+
+    if number < 5 {
+        println!("Less than 5");
+    } else if number < 10 {
+        println!("Between 5 and 10");
+    } else {
+        println!("10 or greater");
+    }
+
+    // if is an expression, so it returns a value
+    let x = if number < 5 { 1 } else { 2 };
+}
+\end{lstlisting}
+
+Because \texttt{if} is an expression, you can use it on the right side of a \texttt{let} statement.
+
+\subsection{Loops}
+
+Rust provides three kinds of loops: \texttt{loop}, \texttt{while}, and \texttt{for}.
+
+\textbf{Infinite Loop:} The \texttt{loop} keyword creates an infinite loop:
+
+\begin{lstlisting}
+let mut count = 0;
+loop {
+    count += 1;
+    if count == 10 {
+        break;
+    }
+}
+\end{lstlisting}
+
+\textbf{Conditional Loop:} The \texttt{while} loop continues while a condition is true:
+
+\begin{lstlisting}
+let mut n = 3;
+while n != 0 {
+    println!("{}!", n);
+    n -= 1;
+}
+\end{lstlisting}
+
+\textbf{For Loop:} The \texttt{for} loop iterates over collections:
+
+\begin{lstlisting}
+let arr = [10, 20, 30];
+for element in arr.iter() {
+    println!("{}", element);
+}
+
+// Ranges are also common with for loops
+for n in 1..4 {
+    println!("{}!", n);
+}
+\end{lstlisting}
+
+% ============================================
+% CHAPTER 3: OWNERSHIP
+% ============================================
+\chapter{Core Concepts: Ownership}
+
+Ownership is Rust's most unique feature. It enables memory safety without requiring a garbage collector. Understanding ownership is crucial to mastering Rust.
+
+\section{The Rules of Ownership}
+
+Rust's ownership system is governed by three rules:
+
+\begin{enumerate}
+\item Each value in Rust has a variable that's called its \textbf{owner}.
+\item There can only be \textbf{one owner} at a time.
+\item When the owner goes out of scope, the value will be \textbf{dropped} (freed from memory).
+\end{enumerate}
+
+These simple rules enable Rust to manage memory automatically without a garbage collector, preventing memory leaks and ensuring memory safety.
+
+\section{Move Semantics}
+
+When you assign a value from one variable to another, Rust doesn't create a copy by default for heap-allocated data. Instead, it \textit{moves} the value:
+
+\begin{lstlisting}
+fn main() {
+    let s1 = String::from("hello");
+    let s2 = s1;  // s1 is moved to s2
+
+    // println!("{}", s1);  // ERROR! s1 is no longer valid
+    println!("{}", s2);     // OK
+}
+\end{lstlisting}
+
+After the move, \texttt{s1} is no longer valid. This prevents double-free errors—a common bug in languages like C and C++.
+
+\section{Clone and Copy}
+
+\subsection{Deep Copying with Clone}
+
+If you want to create a deep copy of heap data, use the \texttt{clone} method:
+
+\begin{lstlisting}
+let s1 = String::from("hello");
+let s2 = s1.clone();
+
+// Both s1 and s2 are valid
+println!("{}", s1);
+println!("{}", s2);
+\end{lstlisting}
+
+\subsection{Stack-Only Copy}
+
+Simple types that are stored entirely on the stack implement the \texttt{Copy} trait. These types are copied rather than moved:
+
+\begin{lstlisting}
+let x = 5;
+let y = x;  // x is copied to y, not moved
+
+// Both x and y are valid
+println!("{}", x);
+println!("{}", y);
+\end{lstlisting}
+
+Types that implement \texttt{Copy} include all integer types, floating-point types, booleans, and characters.
+
+% ============================================
+% CHAPTER 4: REFERENCES AND BORROWING
+% ============================================
+\chapter{References and Borrowing}
+
+While ownership is powerful, it can be restrictive. Rust provides \textit{references} to allow you to refer to a value without taking ownership of it.
+
+\section{Using References}
+
+A reference is created using the \texttt{\&} operator:
+
+\begin{lstlisting}
+fn main() {
+    let s1 = String::from("hello");
+    let len = calculate_length(&s1);
+
+    println!("Length of '{}' is {}", s1, len);
+    // s1 is still valid here!
+}
+
+fn calculate_length(s: &String) -> usize {
+    s.len()
+}  // s goes out of scope, but it doesn't own the String, so nothing is dropped
+\end{lstlisting}
+
+Creating a reference is called \textbf{borrowing}. When you borrow a value, you don't take ownership, so the value isn't dropped when the reference goes out of scope.
+
+\section{The Borrowing Rules}
+
+Rust enforces strict borrowing rules at compile time to prevent data races:
+
+\begin{itemize}
+\item At any given time, you can have \textbf{either} one mutable reference \textbf{or} any number of immutable references.
+\item References must always be valid (no dangling references).
+\end{itemize}
+
+These rules prevent data races at compile time, ensuring thread safety.
+
+\section{Mutable References}
+
+You can create mutable references using \texttt{\&mut}:
+
+\begin{lstlisting}
+fn main() {
+    let mut s = String::from("hello");
+    change(&mut s);
+    println!("{}", s);
+}
+
+fn change(s: &mut String) {
+    s.push_str(", world");
+}
+\end{lstlisting}
+
+The restriction is that you can only have one mutable reference to a value in a particular scope. This prevents simultaneous mutations that could cause data races.
+
+\section{Slices}
+
+Slices let you reference a contiguous sequence of elements in a collection rather than the whole collection:
+
+\begin{lstlisting}
+fn main() {
+    let s = String::from("hello world");
+
+    let hello = &s[0..5];   // or &s[..5]
+    let world = &s[6..11];  // or &s[6..]
+
+    println!("{} {}", hello, world);
+}
+\end{lstlisting}
+
+String slices have the type \texttt{\&str}. Slices are references, so they don't take ownership.
+
+% ============================================
+% CHAPTER 5: STRUCTS AND ENUMS
+% ============================================
+\chapter{Structs and Enums}
+
+Structs and enums allow you to create custom data types that are meaningful for your domain.
+
+\section{Defining and Using Structs}
+
+Structs let you group related data together:
+
+\begin{lstlisting}
+struct User {
+    username: String,
+    email: String,
+    sign_in_count: u64,
+    active: bool,
+}
+
+fn main() {
+    let user1 = User {
+        email: String::from("user@example.com"),
+        username: String::from("user123"),
+        active: true,
+        sign_in_count: 1,
+    };
+
+    println!("User: {}", user1.username);
+}
+\end{lstlisting}
+
+\section{Methods}
+
+Methods are functions defined within the context of a struct (or enum or trait). They use the \texttt{impl} block:
+
+\begin{lstlisting}
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle {
+    // Method (takes &self)
+    fn area(&self) -> u32 {
+        self.width * self.height
+    }
+
+    // Associated function (doesn't take self)
+    fn square(size: u32) -> Rectangle {
+        Rectangle { width: size, height: size }
+    }
+}
+\end{lstlisting}
+
+\section{Enums}
+
+Enums allow you to define a type by enumerating its possible variants:
+
+\begin{lstlisting}
+enum IpAddr {
+    V4(u8, u8, u8, u8),
+    V6(String),
+}
+
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 },
+    Write(String),
+    ChangeColor(i32, i32, i32),
+}
+
+let home = IpAddr::V4(127, 0, 0, 1);
+let msg = Message::Write(String::from("hello"));
+\end{lstlisting}
+
+\section{Pattern Matching}
+
+Pattern matching with \texttt{match} is a powerful control flow construct:
+
+\begin{lstlisting}
+enum Coin {
+    Penny,
+    Nickel,
+    Dime,
+    Quarter,
+}
+
+fn value_in_cents(coin: Coin) -> u8 {
+    match coin {
+        Coin::Penny => 1,
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
+        Coin::Quarter => 25,
+    }
+}
+\end{lstlisting}
+
+\section{The Option Enum}
+
+Rust doesn't have null values. Instead, it uses the \texttt{Option<T>} enum to represent optional values:
+
+\begin{lstlisting}
+fn divide(a: i32, b: i32) -> Option<i32> {
+    if b == 0 {
+        None
+    } else {
+        Some(a / b)
+    }
+}
+
+fn main() {
+    match divide(10, 2) {
+        Some(result) => println!("Result: {}", result),
+        None => println!("Cannot divide by zero"),
+    }
+}
+\end{lstlisting}
+
+The \texttt{Option<T>} enum forces you to handle the case where a value might be absent, preventing null pointer errors.
+
+% ============================================
+% CHAPTER 6: COLLECTIONS
+% ============================================
+\chapter{Collections}
+
+Rust's standard library includes several useful data structures called collections. Unlike arrays and tuples, collections store data on the heap, meaning their size can change at runtime.
+
+\section{Vectors}
+
+Vectors (\texttt{Vec<T>}) are resizable arrays:
+
+\begin{lstlisting}
+fn main() {
+    // Creating vectors
+    let v1: Vec<i32> = Vec::new();
+    let v2 = vec![1, 2, 3];
+
+    // Adding elements
+    let mut v3 = Vec::new();
+    v3.push(5);
+    v3.push(6);
+
+    // Accessing elements
+    let third = &v3[2];
+    match v3.get(2) {
+        Some(third) => println!("Third: {}", third),
+        None => println!("No third element"),
+    }
+}
+\end{lstlisting}
+
+\section{Hash Maps}
+
+Hash maps store key-value pairs:
+
+\begin{lstlisting}
+use std::collections::HashMap;
+
+fn main() {
+    let mut scores = HashMap::new();
+
+    scores.insert(String::from("Blue"), 10);
+    scores.insert(String::from("Yellow"), 50);
+
+    // Getting values
+    let team = String::from("Blue");
+    let score = scores.get(&team);
+
+    // Iterating
+    for (key, value) in &scores {
+        println!("{}: {}", key, value);
+    }
+}
+\end{lstlisting}
+
+% ============================================
+% CHAPTER 7: ERROR HANDLING
+% ============================================
+\chapter{Error Handling}
+
+Rust groups errors into two major categories: recoverable and unrecoverable errors. For recoverable errors, Rust uses the \texttt{Result<T, E>} type.
+
+\section{The Result Type}
+
+The \texttt{Result} enum has two variants: \texttt{Ok} and \texttt{Err}:
+
+\begin{lstlisting}
+use std::fs::File;
+
+fn main() {
+    let f = File::open("hello.txt");
+
+    let f = match f {
+        Ok(file) => file,
+        Err(error) => {
+            println!("Error: {:?}", error);
+            return;
+        }
+    };
+}
+\end{lstlisting}
+
+\section{The ? Operator}
+
+The \texttt{?} operator makes error handling more concise:
+
+\begin{lstlisting}
+use std::fs::File;
+use std::io::{self, Read};
+
+fn read_file() -> Result<String, io::Error> {
+    let mut f = File::open("hello.txt")?;
+    let mut s = String::new();
+    f.read_to_string(&mut s)?;
+    Ok(s)
+}
+
+// Even more concise
+fn read_file_short() -> Result<String, io::Error> {
+    std::fs::read_to_string("hello.txt")
+}
+\end{lstlisting}
+
+The \texttt{?} operator propagates errors to the calling function, making error handling clean and readable.
+
+% ============================================
+% CHAPTER 8: GENERICS AND TRAITS
+% ============================================
+\chapter{Generics and Traits}
+
+Generics allow you to write flexible, reusable code. Traits define shared behavior.
+
+\section{Generic Functions}
+
+You can write functions that work with multiple types:
+
+\begin{lstlisting}
+fn largest<T: PartialOrd>(list: &[T]) -> &T {
+    let mut largest = &list[0];
+
+    for item in list {
+        if item > largest {
+            largest = item;
+        }
+    }
+
+    largest
+}
+
+fn main() {
+    let numbers = vec![34, 50, 25, 100, 65];
+    println!("Largest: {}", largest(&numbers));
+}
+\end{lstlisting}
+
+\section{Traits}
+
+Traits define shared behavior:
+
+\begin{lstlisting}
+trait Summary {
+    fn summarize(&self) -> String;
+}
+
+struct Article {
+    headline: String,
+    content: String,
+}
+
+impl Summary for Article {
+    fn summarize(&self) -> String {
+        format!("{}", self.headline)
+    }
+}
+\end{lstlisting}
+
+Traits are similar to interfaces in other languages but with some unique features that make them more powerful.
+
+% ============================================
+% CHAPTER 9: FEARLESS CONCURRENCY
+% ============================================
+\chapter{Fearless Concurrency}
+
+Rust's ownership and type systems enable safe concurrent programming. The compiler prevents data races at compile time.
+
+\section{Threads}
+
+Creating threads in Rust is straightforward:
+
+\begin{lstlisting}
+use std::thread;
+
+fn main() {
+    let handle = thread::spawn(|| {
+        for i in 1..10 {
+            println!("Thread: {}", i);
+        }
+    });
+
+    for i in 1..5 {
+        println!("Main: {}", i);
+    }
+
+    handle.join().unwrap();
+}
+\end{lstlisting}
+
+\section{Message Passing with Channels}
+
+Channels allow threads to communicate by sending messages:
+
+\begin{lstlisting}
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        tx.send(String::from("hi")).unwrap();
+    });
+
+    let received = rx.recv().unwrap();
+    println!("Got: {}", received);
+}
+\end{lstlisting}
+
+\section{Shared State with Mutex}
+
+For shared state, Rust provides \texttt{Mutex} and \texttt{Arc}:
+
+\begin{lstlisting}
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Arc::clone(&counter);
+        let handle = thread::spawn(move || {
+            *counter.lock().unwrap() += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());
+}
+\end{lstlisting}
+
+% ============================================
+% CHAPTER 10: SUMMARY AND NEXT STEPS
+% ============================================
+\chapter{Summary and Next Steps}
+
+\section{What You've Learned}
+
+Congratulations! You've covered the fundamental concepts of Rust programming:
+
+\begin{itemize}
+\item \textbf{Basics}: Variables, types, functions, and control flow
+\item \textbf{Ownership}: Rust's unique memory management system
+\item \textbf{Borrowing}: References and the borrow checker
+\item \textbf{Structs and Enums}: Creating custom data types
+\item \textbf{Collections}: Vectors, strings, and hash maps
+\item \textbf{Error Handling}: Using Result and Option types
+\item \textbf{Generics and Traits}: Writing reusable, polymorphic code
+\item \textbf{Concurrency}: Safe concurrent programming with threads and channels
+\end{itemize}
+
+\section{Next Steps}
+
+To continue your Rust journey:
+
+\begin{enumerate}
+\item \textbf{Practice Daily}: Write Rust code every day to build muscle memory and deepen your understanding.
+
+\item \textbf{Build Projects}: Apply what you've learned by building real projects. Start small and gradually increase complexity.
+
+\item \textbf{Read Code}: Study well-written Rust projects on GitHub. Reading others' code is one of the best ways to learn.
+
+\item \textbf{Join the Community}: Participate in the Rust forum, Discord, or Reddit. The Rust community is welcoming and helpful.
+
+\item \textbf{Advanced Topics}: Explore more advanced topics like macros, async/await, and unsafe Rust.
+
+\item \textbf{Contribute}: Consider contributing to open source Rust projects. It's a great way to learn and give back.
+\end{enumerate}
+
+\section{Resources}
+
+\subsection{Official Resources}
+
+\begin{itemize}
+\item \textbf{The Rust Book}: \texttt{doc.rust-lang.org/book/} - The comprehensive official guide
+\item \textbf{Rust by Example}: \texttt{doc.rust-lang.org/rust-by-example/} - Learn through annotated examples
+\item \textbf{Rustlings}: Interactive exercises to practice Rust concepts
+\item \textbf{Rust Playground}: \texttt{play.rust-lang.org} - Try code in your browser
+\end{itemize}
+
+\subsection{Community Resources}
+
+\begin{itemize}
+\item \textbf{Forum}: \texttt{users.rust-lang.org} - Ask questions and share knowledge
+\item \textbf{Reddit}: \texttt{r/rust} - News, discussions, and community
+\item \textbf{Discord}: Rust Community Server - Real-time chat
+\end{itemize}
+
+\subsection{This Tutorial}
+
+Find the source code and more resources at:
+\begin{itemize}
+\item \textbf{GitHub}: \texttt{github.com/adiel2012/rust-beginner}
+\end{itemize}
+
+\section{Conclusion}
+
+Rust is a powerful language that brings together performance, reliability, and productivity. While it has a steeper learning curve than some languages, the investment pays off in safer, faster, and more maintainable code.
+
+Keep practicing, stay curious, and enjoy your journey as a Rustacean!
+
+\textbf{Happy Coding!}
+
+\end{document}
