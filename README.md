@@ -216,11 +216,25 @@ A comprehensive guide to learning the Rust programming language from scratch.
 
 ## How to Use This Guide
 
-1. Work through chapters sequentially for a structured learning path
-2. Complete exercises at the end of each chapter
-3. Build small projects to reinforce concepts
-4. Join the Rust community for support and collaboration
-5. Practice regularly - consistency is key to mastering Rust
+### Option 1: Interactive Learning with Google Colab (Recommended)
+Click the "Open in Colab" badge next to any chapter to launch an interactive notebook in your browser:
+1. **No installation required** - runs entirely in the cloud
+2. Each notebook **automatically installs Rust** when you run the first cell
+3. All code examples are **executable** - just click "Run" to see results
+4. **Modify and experiment** with the code in real-time
+
+### Option 2: Local Learning
+1. Install Rust locally from [rustup.rs](https://rustup.rs)
+2. Clone this repository
+3. Work through chapters sequentially
+4. Complete exercises at the end of each chapter
+5. Build small projects to reinforce concepts
+
+### General Tips
+- Join the Rust community for support and collaboration
+- Practice regularly - consistency is key to mastering Rust
+- Don't rush through ownership and borrowing - these are fundamental
+- Embrace compiler errors as teaching tools
 
 ## Prerequisites
 
