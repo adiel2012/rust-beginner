@@ -4,7 +4,7 @@ A comprehensive guide to learning the Rust programming language from scratch.
 
 📚 **Available Formats:**
 - [Interactive Jupyter Notebooks](#how-to-use-this-guide) (Run in Google Colab)
-- [LaTeX Beamer Presentation](PRESENTATION.md) (For teaching/presentations)
+- [LaTeX Beamer Presentation](beginner/PRESENTATION.md) (For teaching/presentations)
 
 ## Table of Contents
 
